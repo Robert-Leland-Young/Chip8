@@ -140,19 +140,31 @@ if (argc<2) { /* Check Command Line Parameters */
               break;  /* end, 7 - OpCode */
          
               case 0x8:  /* 8 - OpCode */
-                 fprintf(fout,"LD    V%1X,V%1X          ' Load V%1X with V%1X",msbl,lsbh,msbl,lsbh);   
-                           
+                if (lsbl==0) fprintf(fout,"LD    V%1X,V%1X          ' Load V%1X with V%1X",msbl,lsbh,msbl,lsbh);   
+                if (lsbl==1) fprintf(fout,"OR    V%1X,V%1X          ' V%1X = V%1X OR V%1X",msbl,lsbh,msbl,msbl,lsbh);   
+                if (lsbl==2) fprintf(fout,"AND   V%1X,V%1X          ' V%1X = V%1X AND V%1X",msbl,lsbh,msbl,msbl,lsbh);   
+                if (lsbl==3) fprintf(fout,"XOR   V%1X,V%1X          ' V%1X = V%1X XOR V%1X",msbl,lsbh,msbl,msbl,lsbh);   
+                if (lsbl==4) fprintf(fout,"ADD   V%1X,V%1X          ' V%1X = V%1X + V%1X, VF=1 for Carry",msbl,lsbh,msbl,msbl,lsbh);   
+                if (lsbl==5) fprintf(fout,"SUB   V%1X,V%1X          ' V%1X = V%1X - V%1X, VF=1 for V%1X>V%1X",msbl,lsbh,msbl,msbl,lsbh,msbl,lsbh);   
+                if (lsbl==6) fprintf(fout,"SHR   V%1X,V%1X          ' V%1X = V%1X/2, VF=1 if V%1X bit0=1",msbl,lsbh,msbl,msbl,msbl);   
+                if (lsbl==7) fprintf(fout,"SUBN  V%1X,V%1X          ' V%1X = V%1X - V%1X, VF=1 for V%1X>V%1X",msbl,lsbh,msbl,lsbh,msbl,lsbh,msbl);   
+                if (lsbl==0xE) fprintf(fout,"SHL   V%1X,V%1X          ' V%1X = V%1X*2, VF=1 if V%1X bit7=1",msbl,lsbh,msbl,msbl,msbl);   
+                                         
               break;  /* end, 8 - OpCode */
          
               case 0x9:  /* 9 - OpCode */
+                fprintf(fout,"SNE   V%1X,V%1X          ' Skip Next OP if V%1X!=V%1X",msbl,lsbh,msbl,lsbh);   
                   
               break;  /* end, 9 - OpCode */
          
               case 0xA:  /* A - OpCode */
+                 
+                 fprintf(fout,"LD    I,0x%03X        ' Load I with 0x%3X",lsb+(msbl << 8),lsb+(msbl << 8));   
                   
               break;  /* end, A - OpCode */
          
               case 0xB:  /* B - OpCode */
+                 fprintf(fout,"JP    V0,0x%03X       ' Jump to Address (V0)+0x%03X",lsb+(msbl << 8),lsb+(msbl << 8)); /* Jump to ADDRESS */
                   
               break;  /* end, B - OpCode */
          
