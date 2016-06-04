@@ -30,14 +30,6 @@ if (argc<2) { /* Check Command Line Parameters */
     return(argc);  /* Leave */
     }
 
-/* Display Command Line Arguments */
-    
-    printf("argc=%u\n",argc);
-
-    for (i=0;i<argc;i++) {
-        printf("argv[%u]=%s\n",i,argv[i]);
-    }
-
 /* Set beginning disassembly Address */
     if (argc<4) { /* Default 0x200 */
         addr=0x200;
@@ -46,6 +38,18 @@ if (argc<2) { /* Check Command Line Parameters */
        sscanf(argv[3],"%x",&addr); 
     }
 
+/* Display Command Line Arguments */
+    
+    printf("%s Executing:\n",argv[0]);
+    printf("Input Binary: %s \n",argv[1]);
+    if (argc<3) { /* no output file */
+      printf("Output: Screen\n");
+        } /* end, no output file */
+    else {
+        printf("Output File: %s \n",argv[2]);
+        }
+    printf("Begin Offset: %0X\n",addr);
+    
     
 /* Try to open the input file */
     fin = fopen(argv[1],"rb");
@@ -86,8 +90,6 @@ if (argc<2) { /* Check Command Line Parameters */
             lsbh=lsb >> 4;      /* Shift out lower Nibble of LSB */
             lsbl=0x0F & lsb;    /* Mask out upper Nibble of LSB */
             
-            fprintf(stdout,"%04X  %02X %02X  %1X  %1X  %1X  %1X\r\n",fp,msb,lsb,msbh,msbl,lsbh,lsbl);
-                
             fprintf(fout,"%04X  %02X %02X    ",fp,msb,lsb);
 
             switch (msbh) {     /* Decode the Instruction Switch */
@@ -105,7 +107,7 @@ if (argc<2) { /* Check Command Line Parameters */
                             fprintf(fout,"JMP   0x%1X%02X          ' JMP to Address or Data",msbl,lsb); /* Jump to ADDRESS */
                             }   
                             else { 
-                                fprintf(fout,"NOP                  ' JMP 0000 or Data"); /* No Operation */                   
+                                fprintf(fout,"JMP                  ' JMP 0000 or Data"); /* No Operation */                   
                                 }
                             }
                     }
@@ -225,6 +227,8 @@ fprintf(fout,"\r\n\r\nEnd of File, Processing Complete.\r\n");
 fprintf(fout,"\r\nInput Binary File: %s\r\n",argv[1]);
 time(&now);  /* Get current time */
 fprintf(fout,"\r\nTime: %24.24s\r\n",ctime(&now));
+
+if (fout!=stdout) printf("End of File, Processing Complete.\r\n");
           
           
 fclose(fin);
