@@ -1,15 +1,19 @@
 #include "stdio.h"
+#include "time.h"
 
 int main(int argc, char **argv)
 {
 int i;                      /* Loop index */
 unsigned int addr;          /* Disassembly address & Input File offset */
 unsigned char msb,lsb;      /* Instruction High & Low order bytes */
-unsigned char msbh,msbl;    /* Instruction MSB High & Low order  */
-unsigned char lsbh,lsbl;    /* Instruction LSB High & Low order  */
+unsigned char msbh,msbl;    /* Instruction MSB High & Low order Nibbles */
+unsigned char lsbh,lsbl;    /* Instruction LSB High & Low order Nibbles */
 FILE *fin;                  /* Input Chip8 Binary File */
 FILE *fout;                 /* Output ASCII Disassembly Listing File */
 fpos_t fp;                  /* Input file offset */
+int line;                   /* Listing line counter */    
+int pagesize=30;            /* listing page size */
+time_t now;                 /* Current Time structure */
     
     
 if (argc<2) { /* Check Command Line Parameters */
@@ -63,10 +67,13 @@ if (argc<2) { /* Check Command Line Parameters */
         return(0);
         }
     }
+
+    line=1;                     /* initialize listing line counter */
+    fprintf(fout,"              Chip-8 Disassembler            \r\n\r\n"); /* Column header */
     /* Read Chip 8 Binary File */
     fp=addr; /* Initial File offset */
     if (0==fseek(fin,fp,SEEK_SET)) {  /* go to start of Disassembly */
-        fprintf(fout,"Addr  Data     Mnemonic             Comment\r\n"); /* Column header */
+        fprintf(fout,"Addr  Data     Mnemonic             Comment\r\n\r\n"); /* Column header */
         while (!feof(fin)) { /* Process input Binary */
             msb=fgetc(fin);     /* high order byte of instruction */
             if (!feof(fin)) {   /* if not EOF get LSB of instruction */  
@@ -95,10 +102,10 @@ if (argc<2) { /* Check Command Line Parameters */
                       }
                       else { 
                         if (0 != (msbl+lsb)) {
-                            fprintf(fout,"JMP   0x%1X%02X          ' JMP to Address",msbl,lsb); /* Jump to ADDRESS */
+                            fprintf(fout,"JMP   0x%1X%02X          ' JMP to Address or Data",msbl,lsb); /* Jump to ADDRESS */
                             }   
                             else { 
-                                fprintf(fout,"NOP                  ' No Operation"); /* No Operation */                   
+                                fprintf(fout,"NOP                  ' JMP 0000 or Data"); /* No Operation */                   
                                 }
                             }
                     }
@@ -185,7 +192,16 @@ if (argc<2) { /* Check Command Line Parameters */
               break;  /* end, E - OpCode */
          
               case 0xF:  /* F - OpCode */
-                  
+               if (lsb == 0x7) fprintf(fout,"LD    V%1X,DT          ' V%1X = (DT) Get Delay Timer",msbl,msbl);   
+               if (lsb == 0x0A) fprintf(fout,"LD    V%1X,K           ' V%1X = (KEY) Get Key Input",msbl,msbl);   
+               if (lsb == 0x15) fprintf(fout,"LD    DT,V%1X          ' (DT) = V%1X  Set Delay Timer",msbl,msbl);   
+               if (lsb == 0x18) fprintf(fout,"LD    ST,V%1X          ' (ST) = V%1X  Set Sound Timer",msbl,msbl);   
+               if (lsb == 0x1E) fprintf(fout,"ADD   I,V%1X           ' Set I = I + V%1X",msbl,msbl);   
+               if (lsb == 0x29) fprintf(fout,"LD    F,V%1X           ' Set I = Address of Sprite in V%1X",msbl,msbl);   
+               if (lsb == 0x33) fprintf(fout,"LD    B,V%1X           ' Store BCD of V%1X at (I) to (I+2)",msbl,msbl);   
+               if (lsb == 0x55) fprintf(fout,"LD    [I],V%1X         ' Store V0 thru V%1X at (I)",msbl,msbl);   
+               if (lsb == 0x65) fprintf(fout,"LD    V%1X,[I]         ' Read V0 thru V%1X From (I)",msbl,msbl);   
+
               break;  /* end, F - OpCode */
          
 
@@ -194,6 +210,10 @@ if (argc<2) { /* Check Command Line Parameters */
             } /* end, Decode the Instruction Switch */
             fprintf(fout,"\r\n");  /* Terminate output line */
             fp+=2;  /* Increment Offset Index */    
+            if (line++ >= pagesize) { /* display Page column header */
+                line=1;
+                fprintf(fout,"\r\nAddr  Data     Mnemonic             Comment\r\n\r\n"); /* Column header */
+                }  /* end, display Page column header */
             } /* end, if not EOF get LSB of instruction */  
         } /* end, Process input Binary */
     } /* end, go to start of Disassembly */
@@ -201,8 +221,12 @@ if (argc<2) { /* Check Command Line Parameters */
           printf("File Offset I/O error: %s\n",argv[1]);
           } /* end, Couldn't Seek to Offset */
 
-fprintf(fout,"\r\nProcessing Complete.\r\n");
-    
+fprintf(fout,"\r\n\r\nEnd of File, Processing Complete.\r\n");
+fprintf(fout,"\r\nInput Binary File: %s\r\n",argv[1]);
+time(&now);  /* Get current time */
+fprintf(fout,"\r\nTime: %24.24s\r\n",ctime(&now));
+          
+          
 fclose(fin);
 fclose(fout);
 return(argc); /* Leave */
