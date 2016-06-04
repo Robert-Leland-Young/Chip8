@@ -18,11 +18,11 @@ time_t now;                 /* Current Time structure */
     
 if (argc<2) { /* Check Command Line Parameters */
 
-    printf("Disassembler for Chip-8 Binary Files\n\n");
+    printf("\r\nDisassembler for Chip-8 & Chip-48 Binary Files\n\n");
     printf("Usage:\n");
-    printf("%s input_file output_file begin_hex_addr\n\n",argv[0]);
+    printf("%s input_file output_file begin_addr\n\n",argv[0]);
     
-    printf("input_file  - Chip-8 Binary executable (required)\n");
+    printf("input_file  - Chip-8/48 Binary executable (required)\n");
     printf("output_file - Disassembly output ASCII filename (optional)\n");
     printf("begin_addr  - Hexadecimal offset at which to begin Disassembly\n");
     printf("              Optional parameter. Default is 0x200.\n"); 
@@ -73,7 +73,7 @@ if (argc<2) { /* Check Command Line Parameters */
     }
 
     line=1;                     /* initialize listing line counter */
-    fprintf(fout,"              Chip-8 Disassembler            \r\n\r\n"); /* Column header */
+    fprintf(fout,"\r\n                Chip-8 & Chip-48 Disassembler            \r\n\r\n"); /* Column header */
     /* Read Chip 8 Binary File */
     fp=addr; /* Initial File offset */
     if (0==fseek(fin,fp,SEEK_SET)) {  /* go to start of Disassembly */
@@ -95,22 +95,38 @@ if (argc<2) { /* Check Command Line Parameters */
             switch (msbh) {     /* Decode the Instruction Switch */
  
               case 0x0:  /* 0 - OpCode */
-                  if (lsb==0xE0) { 
+                  /* Handle SuperChip or Chip-48 Additions */
+                  if (((lsbh == 0xC) || (lsb >= 0xFB)) && (msbl==0)) {
+                    /* it's a Chip-48 Opcode */
+                     if (lsbh==0xC) { /* 00CN Scroll Down */
+                        fprintf(fout,"SCD   0x%1X            ' Scroll Down 0x%1X Lines",lsbl,lsbl); 
+                      } /* end, 00CN Scroll Down */
+                     if (lsbh==0xF) { /* handle screen & EXIT Opcodes */
+                        if (lsbl==0xB) fprintf(fout,"SCR                  ' Scroll 4 Pixels Right");
+                        if (lsbl==0xC) fprintf(fout,"SCL                  ' Scroll 4 Pixels Left");
+                        if (lsbl==0xD) fprintf(fout,"EXIT                 ' Exit Interpreter");
+                        if (lsbl==0xE) fprintf(fout,"LOW                  ' Disable Extended Graphics");
+                        if (lsbl==0xF) fprintf(fout,"HIGH                 ' Enable Extended Graphics");
+                        
+                      } /* end, handle screen & EXIT Opcodes */
+                      break; /* leave 0 - Opcode for Chip-48 Opcodes */
+                    } /* end, it's a Chip-48 Opcode */
+                  if (lsb==0xE0) { /* if lsb=0xE0 */
                       fprintf(fout,"CLS                  ' Clear Screen"); /* Clear Screen */
-                    }
-                    else {
+                    } /* end if, lsb=0xE0 */
+                    else { /* else if, lsb=0xEE */
                       if (lsb==0xEE) { 
                         fprintf(fout,"RET                  ' Return"); /* Return from Subroutine */
                       }
-                      else { 
-                        if (0 != (msbl+lsb)) {
+                      else { /* else if, 0!=(msb+lsb) */
+                        if (0 != (msbl+lsb)) { /* JMP non-Zero */
                             fprintf(fout,"JMP   0x%1X%02X          ' JMP to Address or Data",msbl,lsb); /* Jump to ADDRESS */
-                            }   
-                            else { 
+                            } /* end, JMP non-Zero */
+                            else { /* else if JMP 0 or Data */
                                 fprintf(fout,"JMP                  ' JMP 0000 or Data"); /* No Operation */                   
-                                }
-                            }
-                    }
+                                } /* end, else if JMP 0 or Data */
+                            } /* end, else if, 0!=(msb+lsb) */
+                    } /* end, else if, lsb=0xEE */
                       
               break; /* end, 0 - OpCode */
               
@@ -200,19 +216,23 @@ if (argc<2) { /* Check Command Line Parameters */
                if (lsb == 0x18) fprintf(fout,"LD    ST,V%1X          ' (ST) = V%1X  Set Sound Timer",msbl,msbl);   
                if (lsb == 0x1E) fprintf(fout,"ADD   I,V%1X           ' Set I = I + V%1X",msbl,msbl);   
                if (lsb == 0x29) fprintf(fout,"LD    F,V%1X           ' Set I = Address of Sprite in V%1X",msbl,msbl);   
+               if (lsb == 0x30) fprintf(fout,"LD    HF,V%1X          ' Set I = Address of 10 byte Sprite Digit in V%1X",msbl,msbl);   
                if (lsb == 0x33) fprintf(fout,"LD    B,V%1X           ' Store BCD of V%1X at (I) to (I+2)",msbl,msbl);   
                if (lsb == 0x55) fprintf(fout,"LD    [I],V%1X         ' Store V0 thru V%1X at (I)",msbl,msbl);   
                if (lsb == 0x65) fprintf(fout,"LD    V%1X,[I]         ' Read V0 thru V%1X From (I)",msbl,msbl);   
+               if (msbl <=7 && lsb == 0x75) fprintf(fout,"LD    R,V%1X           ' Store V0-V%1X in RPL User Flags",msbl,msbl);   
+               if (msbl <=7 && lsb == 0x85) fprintf(fout,"LD    V%1X,R           ' Read V0-V%1X from RPL User Flags",msbl,msbl);   
 
               break;  /* end, F - OpCode */
          
 
               default: 
+                fprintf(fout,"                       ' Data ");   
                 
             } /* end, Decode the Instruction Switch */
             fprintf(fout,"\r\n");  /* Terminate output line */
             fp+=2;  /* Increment Offset Index */    
-            if (line++ >= pagesize) { /* display Page column header */
+            if (line++ >= pagesize && !feof(fin)) { /* display Page column header */
                 line=1;
                 fprintf(fout,"\r\nAddr  Data     Mnemonic             Comment\r\n\r\n"); /* Column header */
                 }  /* end, display Page column header */
