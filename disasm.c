@@ -169,14 +169,18 @@ if (argc<2) { /* Check Command Line Parameters */
               break;  /* end, B - OpCode */
          
               case 0xC:  /* C - OpCode */
+                 fprintf(fout,"RND   V%1X,0x%02X        ' Set V%1X = (RND) AND 0x%02X",msbl,lsb,msbl,lsb);   
                   
               break;  /* end, C - OpCode */
          
               case 0xD:  /* D - OpCode */
+                fprintf(fout,"DRW   V%1X,V%1X,0x%1x      ' Display 0x%1X Sprite(s) from (I) at V%1X,V%1X",msbl,lsbh,lsbl,lsbl,msbl,lsbh);   
                   
               break;  /* end, D - OpCode */
          
               case 0xE:  /* E - OpCode */
+               if (lsb == 0x9E) fprintf(fout,"SKP   V%1X             ' Skip Next OP if (V%1X) = (KEY) Down",msbl,msbl);   
+               if (lsb == 0xA1) fprintf(fout,"SKNP  V%1X             ' Skip Next OP if (V%1X) = (KEY) UP",msbl,msbl);   
                   
               break;  /* end, E - OpCode */
          
