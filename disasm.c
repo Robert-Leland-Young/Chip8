@@ -10,7 +10,6 @@ unsigned char msbh,msbl;    /* Instruction MSB High & Low order Nibbles */
 unsigned char lsbh,lsbl;    /* Instruction LSB High & Low order Nibbles */
 FILE *fin;                  /* Input Chip8 Binary File */
 FILE *fout;                 /* Output ASCII Disassembly Listing File */
-fpos_t fp;                  /* Input file offset */
 int line;                   /* Listing line counter */    
 int pagesize=30;            /* listing page size */
 time_t now;                 /* Current Time structure */
@@ -24,8 +23,8 @@ if (argc<2) { /* Check Command Line Parameters */
     
     printf("input_file  - Chip-8/48 Binary executable (required)\n");
     printf("output_file - Disassembly output ASCII filename (optional)\n");
-    printf("begin_addr  - Hexadecimal offset at which to begin Disassembly\n");
-    printf("              Optional parameter. Default is 0x200.\n"); 
+    printf("begin_addr  - Hexadecimal offset at which to begin Disassembly.\n");
+    printf("              i.e. The Load address. Optional, default is 0x200.\n"); 
 
     return(argc);  /* Leave */
     }
@@ -75,8 +74,6 @@ if (argc<2) { /* Check Command Line Parameters */
     line=1;                     /* initialize listing line counter */
     fprintf(fout,"\r\n                Chip-8 & Chip-48 Disassembler            \r\n\r\n"); /* Column header */
     /* Read Chip 8 Binary File */
-    fp=addr; /* Initial File offset */
-    if (0==fseek(fin,fp,SEEK_SET)) {  /* go to start of Disassembly */
         fprintf(fout,"Addr  Data     Mnemonic             Comment\r\n\r\n"); /* Column header */
         while (!feof(fin)) { /* Process input Binary */
             msb=fgetc(fin);     /* high order byte of instruction */
@@ -90,7 +87,7 @@ if (argc<2) { /* Check Command Line Parameters */
             lsbh=lsb >> 4;      /* Shift out lower Nibble of LSB */
             lsbl=0x0F & lsb;    /* Mask out upper Nibble of LSB */
             
-            fprintf(fout,"%04X  %02X %02X    ",fp,msb,lsb);
+            fprintf(fout,"%04X  %02X %02X    ",addr,msb,lsb);
 
             switch (msbh) {     /* Decode the Instruction Switch */
  
@@ -99,7 +96,7 @@ if (argc<2) { /* Check Command Line Parameters */
                   if (((lsbh == 0xC) || (lsb >= 0xFB)) && (msbl==0)) {
                     /* it's a Chip-48 Opcode */
                      if (lsbh==0xC) { /* 00CN Scroll Down */
-                        fprintf(fout,"SCD   0x%1X            ' Scroll Down 0x%1X Lines",lsbl,lsbl); 
+                        fprintf(fout,"SCD   #%1X             ' Scroll Down #%1X Lines",lsbl,lsbl); 
                       } /* end, 00CN Scroll Down */
                      if (lsbh==0xF) { /* handle screen & EXIT Opcodes */
                         if (lsbl==0xB) fprintf(fout,"SCR                  ' Scroll 4 Pixels Right");
@@ -120,7 +117,7 @@ if (argc<2) { /* Check Command Line Parameters */
                       }
                       else { /* else if, 0!=(msb+lsb) */
                         if (0 != (msbl+lsb)) { /* JMP non-Zero */
-                            fprintf(fout,"JMP   0x%1X%02X          ' JMP to Address or Data",msbl,lsb); /* Jump to ADDRESS */
+                            fprintf(fout,"JMP   #%1X%02X           ' JMP to Address or Data",msbl,lsb); /* Jump to ADDRESS */
                             } /* end, JMP non-Zero */
                             else { /* else if JMP 0 or Data */
                                 fprintf(fout,"JMP                  ' JMP 0000 or Data"); /* No Operation */                   
@@ -131,21 +128,21 @@ if (argc<2) { /* Check Command Line Parameters */
               break; /* end, 0 - OpCode */
               
               case 0x1:  /* 1 - OpCode */
-               fprintf(fout,"JMP   0x%1X%02X          ' JMP to Address",msbl,lsb); /* Jump to ADDRESS */
+               fprintf(fout,"JMP   #%1X%02X           ' JMP to Address",msbl,lsb); /* Jump to ADDRESS */
                  
               break;  /* end, 1 - OpCode */
               
               case 0x2:  /* 2 - OpCode */
-               fprintf(fout,"CALL  0x%1X%02X          ' Call Subroutine",msbl,lsb); /* Call Subroutine */
+               fprintf(fout,"CALL  #%1X%02X           ' Call Subroutine",msbl,lsb); /* Call Subroutine */
                  
               break;  /* end, 2 - OpCode */
 
               case 0x3:  /* 3 - OpCode */
-               fprintf(fout,"SE    V%1X,0x%02X        ' Skip Next OP if V%1X=0x%02X",msbl,lsb,msbl,lsb);   
+               fprintf(fout,"SE    V%1X,#%02X         ' Skip Next OP if V%1X=#%02X",msbl,lsb,msbl,lsb);   
               break;  /* end, 3 - OpCode */
               
               case 0x4:  /* 4 - OpCode */
-                fprintf(fout,"SNE   V%1X,0x%02X        ' Skip Next OP if V%1X!=0x%02X",msbl,lsb,msbl,lsb);   
+                fprintf(fout,"SNE   V%1X,#%02X         ' Skip Next OP if V%1X!=#%02X",msbl,lsb,msbl,lsb);   
                  
               break;  /* end, 4 - OpCode */
          
@@ -155,12 +152,12 @@ if (argc<2) { /* Check Command Line Parameters */
               break;  /* end, 5 - OpCode */
 
               case 0x6:  /* 6 - OpCode */
-                fprintf(fout,"LD    V%1X,0x%02X        ' Load V%1X with 0x%1X",msbl,lsb,msbl,lsb);   
+                fprintf(fout,"LD    V%1X,#%02X         ' Load V%1X with #%1X",msbl,lsb,msbl,lsb);   
                   
               break;  /* end, 6 - OpCode */
          
               case 0x7:  /* 7 - OpCode */
-                 fprintf(fout,"ADD   V%1X,0x%02X        ' Set V%1X = V%1X + 0x%02X",msbl,lsb,msbl,msbl,lsb);   
+                 fprintf(fout,"ADD   V%1X,#%02X         ' Set V%1X = V%1X + #%02X",msbl,lsb,msbl,msbl,lsb);   
                  
               break;  /* end, 7 - OpCode */
          
@@ -184,22 +181,22 @@ if (argc<2) { /* Check Command Line Parameters */
          
               case 0xA:  /* A - OpCode */
                  
-                 fprintf(fout,"LD    I,0x%03X        ' Load I with 0x%3X",lsb+(msbl << 8),lsb+(msbl << 8));   
+                 fprintf(fout,"LD    I,#%03X         ' Load I with #%3X",lsb+(msbl << 8),lsb+(msbl << 8));   
                   
               break;  /* end, A - OpCode */
          
               case 0xB:  /* B - OpCode */
-                 fprintf(fout,"JP    V0,0x%03X       ' Jump to Address (V0)+0x%03X",lsb+(msbl << 8),lsb+(msbl << 8)); /* Jump to ADDRESS */
+                 fprintf(fout,"JP    V0,#%03X        ' Jump to Address (V0)+#%03X",lsb+(msbl << 8),lsb+(msbl << 8)); /* Jump to ADDRESS */
                   
               break;  /* end, B - OpCode */
          
               case 0xC:  /* C - OpCode */
-                 fprintf(fout,"RND   V%1X,0x%02X        ' Set V%1X = (RND) AND 0x%02X",msbl,lsb,msbl,lsb);   
+                 fprintf(fout,"RND   V%1X,#%02X         ' Set V%1X = (RND) AND #%02X",msbl,lsb,msbl,lsb);   
                   
               break;  /* end, C - OpCode */
          
               case 0xD:  /* D - OpCode */
-                fprintf(fout,"DRW   V%1X,V%1X,0x%1x      ' Display 0x%1X Sprite(s) from (I) at V%1X,V%1X",msbl,lsbh,lsbl,lsbl,msbl,lsbh);   
+                fprintf(fout,"DRW   V%1X,V%1X,#%1x       ' Display #%1X Sprite(s) from (I) at V%1X,V%1X",msbl,lsbh,lsbl,lsbl,msbl,lsbh);   
                   
               break;  /* end, D - OpCode */
          
@@ -231,17 +228,13 @@ if (argc<2) { /* Check Command Line Parameters */
                 
             } /* end, Decode the Instruction Switch */
             fprintf(fout,"\r\n");  /* Terminate output line */
-            fp+=2;  /* Increment Offset Index */    
+            addr+=2;  /* Increment Offset Index */    
             if (line++ >= pagesize && !feof(fin)) { /* display Page column header */
                 line=1;
                 fprintf(fout,"\r\nAddr  Data     Mnemonic             Comment\r\n\r\n"); /* Column header */
                 }  /* end, display Page column header */
             } /* end, if not EOF get LSB of instruction */  
         } /* end, Process input Binary */
-    } /* end, go to start of Disassembly */
-     else { /* Couldn't Seek to Offset */
-          printf("File Offset I/O error: %s\n",argv[1]);
-          } /* end, Couldn't Seek to Offset */
 
 fprintf(fout,"\r\n\r\nEnd of File, Processing Complete.\r\n");
 fprintf(fout,"\r\nInput Binary File: %s\r\n",argv[1]);
