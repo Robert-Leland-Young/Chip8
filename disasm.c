@@ -116,19 +116,19 @@ if (argc<2) { /* Check Command Line Parameters */
                         fprintf(fout,"RET                  ' Return"); /* Return from Subroutine */
                       }
                       else { /* else if, 0!=(msb+lsb) */
-                        if (0 != (msbl+lsb)) { /* JMP non-Zero */
-                            fprintf(fout,"JMP   #%1X%02X           ' JMP to Address or Data",msbl,lsb); /* Jump to ADDRESS */
-                            } /* end, JMP non-Zero */
-                            else { /* else if JMP 0 or Data */
-                                fprintf(fout,"JMP                  ' JMP 0000 or Data"); /* No Operation */                   
-                                } /* end, else if JMP 0 or Data */
+                        if (0 != (msbl+lsb)) { /* Data not 0*/
+                            fprintf(fout,"DW    #%02X%02X          ' Data #%02X%02X",msbl,lsb,msbl,lsb); 
+                            } /* end, Data not 0 */
+                            else { /* else if 0 Data */
+                                fprintf(fout,"DW    #0000          ' Data #0000");                    
+                                } /* end, else if 0 Data */
                             } /* end, else if, 0!=(msb+lsb) */
                     } /* end, else if, lsb=0xEE */
                       
               break; /* end, 0 - OpCode */
               
               case 0x1:  /* 1 - OpCode */
-               fprintf(fout,"JMP   #%1X%02X           ' JMP to Address",msbl,lsb); /* Jump to ADDRESS */
+               fprintf(fout,"JMP   #%1X%02X           ' JUMP to #%1X%02X",msbl,lsb,msbl,lsb); /* Jump to ADDRESS */
                  
               break;  /* end, 1 - OpCode */
               
@@ -163,14 +163,15 @@ if (argc<2) { /* Check Command Line Parameters */
          
               case 0x8:  /* 8 - OpCode */
                 if (lsbl==0) fprintf(fout,"LD    V%1X,V%1X          ' Load V%1X with V%1X",msbl,lsbh,msbl,lsbh);   
-                if (lsbl==1) fprintf(fout,"OR    V%1X,V%1X          ' V%1X = V%1X OR V%1X",msbl,lsbh,msbl,msbl,lsbh);   
-                if (lsbl==2) fprintf(fout,"AND   V%1X,V%1X          ' V%1X = V%1X AND V%1X",msbl,lsbh,msbl,msbl,lsbh);   
-                if (lsbl==3) fprintf(fout,"XOR   V%1X,V%1X          ' V%1X = V%1X XOR V%1X",msbl,lsbh,msbl,msbl,lsbh);   
-                if (lsbl==4) fprintf(fout,"ADD   V%1X,V%1X          ' V%1X = V%1X + V%1X, VF=1 for Carry",msbl,lsbh,msbl,msbl,lsbh);   
-                if (lsbl==5) fprintf(fout,"SUB   V%1X,V%1X          ' V%1X = V%1X - V%1X, VF=1 for V%1X>V%1X",msbl,lsbh,msbl,msbl,lsbh,msbl,lsbh);   
-                if (lsbl==6) fprintf(fout,"SHR   V%1X,V%1X          ' V%1X = V%1X/2, VF=1 if V%1X bit0=1",msbl,lsbh,msbl,msbl,msbl);   
-                if (lsbl==7) fprintf(fout,"SUBN  V%1X,V%1X          ' V%1X = V%1X - V%1X, VF=1 for V%1X>V%1X",msbl,lsbh,msbl,lsbh,msbl,lsbh,msbl);   
-                if (lsbl==0xE) fprintf(fout,"SHL   V%1X,V%1X          ' V%1X = V%1X*2, VF=1 if V%1X bit7=1",msbl,lsbh,msbl,msbl,msbl);   
+                 else if (lsbl==1) fprintf(fout,"OR    V%1X,V%1X          ' V%1X = V%1X OR V%1X",msbl,lsbh,msbl,msbl,lsbh);   
+                 else if (lsbl==2) fprintf(fout,"AND   V%1X,V%1X          ' V%1X = V%1X AND V%1X",msbl,lsbh,msbl,msbl,lsbh);   
+                 else if (lsbl==3) fprintf(fout,"XOR   V%1X,V%1X          ' V%1X = V%1X XOR V%1X",msbl,lsbh,msbl,msbl,lsbh);   
+                 else if (lsbl==4) fprintf(fout,"ADD   V%1X,V%1X          ' V%1X = V%1X + V%1X, VF=1 for Carry",msbl,lsbh,msbl,msbl,lsbh);   
+                 else if (lsbl==5) fprintf(fout,"SUB   V%1X,V%1X          ' V%1X = V%1X - V%1X, VF=1 for V%1X>V%1X",msbl,lsbh,msbl,msbl,lsbh,msbl,lsbh);   
+                 else if (lsbl==6) fprintf(fout,"SHR   V%1X,V%1X          ' V%1X = V%1X/2, VF=1 if V%1X bit0=1",msbl,lsbh,msbl,msbl,msbl);   
+                 else if (lsbl==7) fprintf(fout,"SUBN  V%1X,V%1X          ' V%1X = V%1X - V%1X, VF=1 for V%1X>V%1X",msbl,lsbh,msbl,lsbh,msbl,lsbh,msbl);   
+                 else if (lsbl==0xE) fprintf(fout,"SHL   V%1X,V%1X          ' V%1X = V%1X*2, VF=1 if V%1X bit7=1",msbl,lsbh,msbl,msbl,msbl);   
+                  else fprintf(fout,"DW    #%02X%02X          ' Data #%02X%02X",msbl,lsb,msbl,lsb); 
                                          
               break;  /* end, 8 - OpCode */
          
@@ -186,7 +187,7 @@ if (argc<2) { /* Check Command Line Parameters */
               break;  /* end, A - OpCode */
          
               case 0xB:  /* B - OpCode */
-                 fprintf(fout,"JP    V0,#%03X        ' Jump to Address (V0)+#%03X",lsb+(msbl << 8),lsb+(msbl << 8)); /* Jump to ADDRESS */
+                 fprintf(fout,"JP    V0,#%03X        ' Jump to Address V0+#%03X",lsb+(msbl << 8),lsb+(msbl << 8)); /* Jump to ADDRESS */
                   
               break;  /* end, B - OpCode */
          
@@ -196,35 +197,33 @@ if (argc<2) { /* Check Command Line Parameters */
               break;  /* end, C - OpCode */
          
               case 0xD:  /* D - OpCode */
-                fprintf(fout,"DRW   V%1X,V%1X,#%1x       ' Display #%1X Sprite(s) from (I) at V%1X,V%1X",msbl,lsbh,lsbl,lsbl,msbl,lsbh);   
+                fprintf(fout,"DRW   V%1X,V%1X,#%1x       ' Display #%1X Sprite(s) from [I] at V%1X,V%1X",msbl,lsbh,lsbl,lsbl,msbl,lsbh);   
                   
               break;  /* end, D - OpCode */
          
               case 0xE:  /* E - OpCode */
                if (lsb == 0x9E) fprintf(fout,"SKP   V%1X             ' Skip Next OP if (V%1X) = (KEY) Down",msbl,msbl);   
-               if (lsb == 0xA1) fprintf(fout,"SKNP  V%1X             ' Skip Next OP if (V%1X) = (KEY) UP",msbl,msbl);   
+               else if (lsb == 0xA1) fprintf(fout,"SKNP  V%1X             ' Skip Next OP if (V%1X) = (KEY) UP",msbl,msbl);   
+                else fprintf(fout,"DW    #%02X%02X          ' Data #%02X%02X",msbl,lsb,msbl,lsb); 
                   
               break;  /* end, E - OpCode */
          
               case 0xF:  /* F - OpCode */
                if (lsb == 0x7) fprintf(fout,"LD    V%1X,DT          ' V%1X = (DT) Get Delay Timer",msbl,msbl);   
-               if (lsb == 0x0A) fprintf(fout,"LD    V%1X,K           ' V%1X = (KEY) Get Key Input",msbl,msbl);   
-               if (lsb == 0x15) fprintf(fout,"LD    DT,V%1X          ' (DT) = V%1X  Set Delay Timer",msbl,msbl);   
-               if (lsb == 0x18) fprintf(fout,"LD    ST,V%1X          ' (ST) = V%1X  Set Sound Timer",msbl,msbl);   
-               if (lsb == 0x1E) fprintf(fout,"ADD   I,V%1X           ' Set I = I + V%1X",msbl,msbl);   
-               if (lsb == 0x29) fprintf(fout,"LD    F,V%1X           ' Set I = Address of Sprite in V%1X",msbl,msbl);   
-               if (lsb == 0x30) fprintf(fout,"LD    HF,V%1X          ' Set I = Address of 10 byte Sprite Digit in V%1X",msbl,msbl);   
-               if (lsb == 0x33) fprintf(fout,"LD    B,V%1X           ' Store BCD of V%1X at (I) to (I+2)",msbl,msbl);   
-               if (lsb == 0x55) fprintf(fout,"LD    [I],V%1X         ' Store V0 thru V%1X at (I)",msbl,msbl);   
-               if (lsb == 0x65) fprintf(fout,"LD    V%1X,[I]         ' Read V0 thru V%1X From (I)",msbl,msbl);   
-               if (msbl <=7 && lsb == 0x75) fprintf(fout,"LD    R,V%1X           ' Store V0-V%1X in RPL User Flags",msbl,msbl);   
-               if (msbl <=7 && lsb == 0x85) fprintf(fout,"LD    V%1X,R           ' Read V0-V%1X from RPL User Flags",msbl,msbl);   
+                else if (lsb == 0x0A) fprintf(fout,"LD    V%1X,K           ' V%1X = (KEY) Get Key Input",msbl,msbl);   
+                else if (lsb == 0x15) fprintf(fout,"LD    DT,V%1X          ' DT = V%1X  Set Delay Timer",msbl,msbl);   
+                else if (lsb == 0x18) fprintf(fout,"LD    ST,V%1X          ' ST = V%1X  Set Sound Timer",msbl,msbl);   
+                else if (lsb == 0x1E) fprintf(fout,"ADD   I,V%1X           ' Set I = I + V%1X",msbl,msbl);   
+                else if (lsb == 0x29) fprintf(fout,"LD    F,V%1X           ' Set I = Address of Sprite in V%1X",msbl,msbl);   
+                else if (lsb == 0x30) fprintf(fout,"LD    HF,V%1X          ' Set I = Address of 10 byte Sprite Digit in V%1X",msbl,msbl);   
+                else if (lsb == 0x33) fprintf(fout,"LD    B,V%1X           ' Store BCD of V%1X at [I] to [I+2]",msbl,msbl);   
+                else if (lsb == 0x55) fprintf(fout,"LD    [I],V%1X         ' Store V0 thru V%1X at [I]",msbl,msbl);   
+                else if (lsb == 0x65) fprintf(fout,"LD    V%1X,[I]         ' Read V0 thru V%1X From [I]",msbl,msbl);   
+                else if (msbl <=7 && lsb == 0x75) fprintf(fout,"LD    R,V%1X           ' Store V0-V%1X in RPL User Flags",msbl,msbl);   
+                else if (msbl <=7 && lsb == 0x85) fprintf(fout,"LD    V%1X,R           ' Read V0-V%1X from RPL User Flags",msbl,msbl);   
+                else fprintf(fout,"DW    #%02X%02X          ' Data #%02X%02X",msbl,lsb,msbl,lsb); 
 
               break;  /* end, F - OpCode */
-         
-
-              default: 
-                fprintf(fout,"                       ' Data ");   
                 
             } /* end, Decode the Instruction Switch */
             fprintf(fout,"\r\n");  /* Terminate output line */
