@@ -41,13 +41,26 @@ int main(int argc, char **argv) {
 
 	// Command usage
 	if (argc < 2) {
-		cout << "Usage: chip8 <ROM file> Debug Output_File\r\n" << endl;
-		cout << "<ROM file   -   Filename of Chip8 program to Execute\r\n" << endl;
+		int i, j;
+
+		/* Parse out filename */
+		j = strlen(argv[0]);
+		for (i = j; j > 0; j--) if (*(argv[0] + j) == '\\') break;
+		j++; /* Skip '\\' */
+
+		printf("Usage:\r\n\r\n%s ROM_file Debug Output_File\r\n\r\n",argv[0]+j);
+		cout << "ROM_file    -   Filename of Chip8 program to Execute\r\n" << endl;
 		cout << "Debug       -   Initiate Debug Trace in Console Window or File\r\n" << endl;
 		cout << "Output_File -   Filename to send Debug Trace Information to\r\n" << endl;
 		cout << "Notes:\r\n" << endl;
-		cout << "The Debug and Output_File parameters are optional.\r\n" << endl;
-		cout << "To enter Debug Mode from the Console Window Press <Enter>\r\n" << endl;
+		cout << "The Debug and Output_File parameters are optional.\r\n" ;
+		cout << "To enter Debug Mode from the Console Window\r\n" ;
+		cout << "Press any key. Backspace is recommended.\r\n" ;
+		cout << "The Console Window must have the Focus." << endl;
+		cout << "Console Debug Mode allows one to Trace Execution," << endl;
+		cout << "Single Step, Set a Stop Address, and Dump Memory." << endl;
+		cout << "Left and Right Mouse Clicks Pause/Start the Trace." << endl;
+
 		return 1;
 	}
 
