@@ -46,7 +46,6 @@ int main(int argc, char **argv) {
 		/* Parse out filename */
 		j = strlen(argv[0]);
 		for (i = j; j > 0; j--) if (*(argv[0] + j) == '\\') break;
-		j++; /* Skip '\\' */
 
 		printf("Usage:\r\n\r\n%s ROM_file Debug Output_File\r\n\r\n",argv[0]+j);
 		cout << "ROM_file    -   Filename of Chip8 program to Execute\r\n" << endl;
