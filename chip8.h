@@ -10,6 +10,7 @@ private:
 
     uint8_t memory[4096];               // Memory (4k)
     uint8_t V[16];                      // V registers (V0-VF)
+	uint8_t RPL[8];						// Chip-48 Register V0-V7 Store Bank
 
     uint16_t pc;                        // Program counter
     uint16_t opcode;                    // Current op code

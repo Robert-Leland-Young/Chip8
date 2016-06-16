@@ -8,9 +8,9 @@
 #include <thread>
 #include "stdint.h"
 #include "SDL.h"      /* SDL 2*/
-
-
 #include "chip8.h"
+
+#include "windows.h"
 
 using namespace std;
 
@@ -34,10 +34,14 @@ uint8_t keymap[16] = {
 	SDLK_v,
 };
 
+SDL_Window* window = NULL;
+
+
 int main(int argc, char **argv) {
 
 	unsigned char debug_out[256];  /* Debug output filename */
 	int debug;		/* Debug On > 0 or OFF = 0 */
+
 
 	// Command usage
 	if (argc < 2) {
@@ -46,8 +50,8 @@ int main(int argc, char **argv) {
 		/* Parse out filename */
 		j = strlen(argv[0]);
 		for (i = j; j > 0; j--) if (*(argv[0] + j) == '\\') break;
-
-		printf("Usage:\r\n\r\n%s ROM_file Debug Output_File\r\n\r\n",argv[0]+j);
+		sprintf((char *)debug_out, argv[0] + j + 1); 
+		printf("Usage:\r\n\r\n%s ROM_file Debug Output_File\r\n\r\n",debug_out);
 		cout << "ROM_file    -   Filename of Chip8 program to Execute\r\n" << endl;
 		cout << "Debug       -   Initiate Debug Trace in Console Window or File\r\n" << endl;
 		cout << "Output_File -   Filename to send Debug Trace Information to\r\n" << endl;
@@ -55,10 +59,12 @@ int main(int argc, char **argv) {
 		cout << "The Debug and Output_File parameters are optional.\r\n" ;
 		cout << "To enter Debug Mode from the Console Window\r\n" ;
 		cout << "Press any key. Backspace is recommended.\r\n" ;
-		cout << "The Console Window must have the Focus." << endl;
+		cout << "The Console Window must have the Focus to Debug." << endl;
 		cout << "Console Debug Mode allows one to Trace Execution," << endl;
 		cout << "Single Step, Set a Stop Address, and Dump Memory." << endl;
 		cout << "Left and Right Mouse Clicks Pause/Start the Trace." << endl;
+		cout << "The Debugger is always started in Single Step Mode" << endl;
+		cout << "when the Debug command line parameter is used." << endl;
 
 		return 1;
 	}
@@ -76,8 +82,7 @@ int main(int argc, char **argv) {
 	int h = 512;                   // Window height
 
 									// The window we'll be rendering to
-	SDL_Window* window = NULL;
-
+	
 	// Initialize SDL
 	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 		printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
@@ -105,9 +110,10 @@ int main(int argc, char **argv) {
 		SDL_TEXTUREACCESS_STREAMING,
 		64, 32);
 
+
 	// Temporary pixel buffer
 	uint32_t pixels[2048];
-
+	
 
 load:
 
