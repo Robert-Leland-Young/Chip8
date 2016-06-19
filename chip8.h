@@ -22,8 +22,15 @@ private:
     void init();
 
 public:
-    uint8_t  gfx[64 * 32];              // Graphics buffer
-    uint8_t  key[16];                   // Keypad
+	// Graphics buffer Low Resolution 64x32 High Resolution 128x64
+  //uint8_t  gfx[64 * 32];              
+	uint8_t  gfx[128 * 64];				// Always reserve for High Resolution
+	bool	 gfx_mode;					// True High Resolution, False Low Resolution
+	unsigned  gfx_size = 128 * 64;		// Graphics Buffer Size
+	unsigned  gfx_x;					// Graphics X coordinate size
+	unsigned  gfx_y;					// Graphics Y coordinate size
+
+	uint8_t  key[16];                   // Keypad
     bool drawFlag;                      // Indicates a draw has occurred
 
     Chip8();
@@ -32,6 +39,7 @@ public:
     void emulate_cycle();               // Emulate one cycle
 										// Load application & Debugger
 	bool load(const char *file_path, unsigned char *debug_out, int debug); 
+
 
 	void trace(char *ins);				// Debug Instruction Trace
 	int DEBUG;							// Debug Flag

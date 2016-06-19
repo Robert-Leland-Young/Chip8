@@ -59,6 +59,7 @@ void Chip8::trace(char *ins)  /* Output Instructuction Trace */
   unsigned int byte;
   int disp_menu = 0;
 
+  
   if (DEBUG > 0) { /* If Debug Trace is active */
 
 status:

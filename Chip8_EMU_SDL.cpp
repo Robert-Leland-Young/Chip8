@@ -1,4 +1,3 @@
-
 // Chip8_EMU_SDL.cpp : Defines the entry point for the console application.
 //
 
@@ -34,7 +33,11 @@ uint8_t keymap[16] = {
 	SDLK_v,
 };
 
+void start_SDL(unsigned gfx_x, unsigned gfx_y);
+
 SDL_Window* window = NULL;
+SDL_Renderer *renderer;
+SDL_Texture* sdlTexture;
 
 
 int main(int argc, char **argv) {
@@ -77,49 +80,27 @@ int main(int argc, char **argv) {
 
 	Chip8 chip8 = Chip8();          // Initialise Chip8
 
-
-	int w = 1024;                   // Window width
-	int h = 512;                   // Window height
-
-									// The window we'll be rendering to
-	
-	// Initialize SDL
-	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
-		printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
-		exit(1);
-	}
-	// Create window
-	window = SDL_CreateWindow(
-		"CHIP-8 Emulator",
-		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-		w, h, SDL_WINDOW_SHOWN
-	);
-	if (window == NULL) {
-		printf("Window could not be created! SDL_Error: %s\n",
-			SDL_GetError());
-		exit(2);
-	}
-
-	// Create renderer
-	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
-	SDL_RenderSetLogicalSize(renderer, w, h);
-
-	// Create texture that stores frame buffer
-	SDL_Texture* sdlTexture = SDL_CreateTexture(renderer,
-		SDL_PIXELFORMAT_ARGB8888,
-		SDL_TEXTUREACCESS_STREAMING,
-		64, 32);
+	// Assume Low Resolution Graphics
+	chip8.gfx_mode = FALSE;  // Assume Low resolution
+	chip8.gfx_x = 64;		// 64 pixel & 64 byte buffer horixontal dimension
+	chip8.gfx_y = 32;		// 32 pixel & 32 byte buffer vertical dimension
 
 
-	// Temporary pixel buffer
-	uint32_t pixels[2048];
-	
+	// Temporary pixel buffer, Assume High Resolution
+	uint32_t pixels[64 * 128];
+
 
 load:
 
+	start_SDL(chip8.gfx_x, chip8.gfx_y);		// Start SDL Graphics
+
+
 	// Attempt to load ROM & Initialize Debugger
-	if (!chip8.load(argv[1],debug_out,debug))
+	if (!chip8.load(argv[1], debug_out, debug))
+	{
+		SDL_Quit();
 		return 2;
+	}
 
 	// Emulation loop
 	while (true) {
@@ -128,16 +109,20 @@ load:
 		// Process SDL events
 		SDL_Event e;
 		while (SDL_PollEvent(&e)) {
-			if (e.type == SDL_QUIT) exit(0);
+			if (e.type == SDL_QUIT) 
+				exit(0);
 
 			// Process keydown events
 			if (e.type == SDL_KEYDOWN) {
-				if (e.key.keysym.sym == SDLK_ESCAPE)
+				if (e.key.keysym.sym == SDLK_ESCAPE) {
+					SDL_Quit();
 					exit(0);
-
-				if (e.key.keysym.sym == SDLK_F1)
+				}
+				if (e.key.keysym.sym == SDLK_F1) {
+					SDL_Quit();
 					goto load;      // *gasp*, a goto statement!
 									// Used to reset/reload ROM
+				}
 
 				for (int i = 0; i < 16; ++i) {
 					if (e.key.keysym.sym == keymap[i]) {
@@ -176,4 +161,47 @@ load:
 		std::this_thread::sleep_for(std::chrono::microseconds(1200));
 
 	}
+}
+
+
+
+void start_SDL(unsigned gfx_x, unsigned gfx_y)
+{
+
+
+int w = 1024;                   // Window width in screen coordinates
+int h = 512;                   // Window height in screen coordinates
+
+							   // The window we'll be rendering to
+
+							   // Initialize SDL
+if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
+	printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+	SDL_Quit();
+	exit(1);
+}
+// Create window
+window = SDL_CreateWindow(
+	"CHIP-8 Emulator",
+	SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+	w, h, SDL_WINDOW_SHOWN
+);
+if (window == NULL) {
+	printf("Window could not be created! SDL_Error: %s\n",
+		SDL_GetError());
+	SDL_Quit();
+	exit(2);
+}
+
+// Create renderer
+renderer = SDL_CreateRenderer(window, -1, 0);
+SDL_RenderSetLogicalSize(renderer, w, h);
+
+// Create texture that stores frame buffer
+sdlTexture = SDL_CreateTexture(renderer,
+	SDL_PIXELFORMAT_ARGB8888,
+	SDL_TEXTUREACCESS_STREAMING,
+	gfx_x, gfx_y);
+
+return;
 }
