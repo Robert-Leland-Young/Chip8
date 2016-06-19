@@ -145,12 +145,12 @@ load:
 			chip8.drawFlag = false;
 
 			// Store pixels in temporary buffer
-			for (int i = 0; i < 2048; ++i) {
+			for (unsigned i = 0; i < chip8.gfx_size; ++i) {
 				uint8_t pixel = chip8.gfx[i];
 				pixels[i] = (0x00FFFFFF * pixel) | 0xFF000000;
 			}
 			// Update SDL texture
-			SDL_UpdateTexture(sdlTexture, NULL, pixels, 64 * sizeof(Uint32));
+			SDL_UpdateTexture(sdlTexture, NULL, pixels, chip8.gfx_x * sizeof(Uint32));
 			// Clear screen and render
 			SDL_RenderClear(renderer);
 			SDL_RenderCopy(renderer, sdlTexture, NULL, NULL);
