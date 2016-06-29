@@ -10,9 +10,9 @@ unsigned int  addr;          /* Instruction Address */
 unsigned char msb, lsb;      /* Instruction High & Low order bytes */
 unsigned char msbh, msbl;    /* Instruction MSB High & Low order Nibbles */
 unsigned char lsbh, lsbl;    /* Instruction LSB High & Low order Nibbles */
-char ins[128];               /* Debug Instruction Description */
+char ins[1024];              /* Debug Instruction Description */
 FILE *fout;					 /* Debug output File descripter */
-unsigned int stop;			 /* Debug Stop/Breakpoint Address */
+unsigned int stop=0x1000;	 /* Debug Stop/Breakpoint Address */
 
 unsigned char chip8_fontset[80] =
 {
@@ -51,6 +51,9 @@ unsigned char chip48_BCD_Digit[100] =
 
 
 extern 	SDL_Window* window;
+extern void start_SDL(unsigned gfx_x, unsigned gfx_y, bool gfx_mode);
+
+static int last_debug = 0;
 
 void Chip8::trace(char *ins)  /* Output Instructuction Trace */
 {
@@ -60,7 +63,7 @@ void Chip8::trace(char *ins)  /* Output Instructuction Trace */
   int disp_menu = 0;
 
   
-  if (DEBUG > 0) { /* If Debug Trace is active */
+  if (DEBUG > 0 && DEBUG !=4) { /* If Debug Trace is active */
 
 status:
 		fprintf(fout, "\r\n%04X  %02X %02X    %s\r\n\r\n", addr, msb, lsb, ins);  /* Debug Trace Instruction Address & OpCode*/
@@ -97,21 +100,26 @@ status:
 	  if (DEBUG==1) printf("Debug: Trace is ON\r\n\r\n");
 	  if (DEBUG == 2) printf("Debug: Single Step Mode\r\n\r\n");
 
-	  if (stop!=0) printf("Stop at: %4.4X\r\n\r\n",stop);
+	  if (stop<0x1000) printf("Stop at: %4.4X\r\n\r\n",stop);
 menu:
-	  printf("Command Menu\r\n");
+	  printf("   Debug Command Menu\r\n\r\n");
 	  printf("ON   - Turn Continuous Trace ON\r\n");
 	  printf("OFF  - Turn Continuous Trace OFF\r\n");
-	  printf("STEP - Single Step Mode\r\n");
-	  printf("STOP - Stop at Address, 0=Off\r\n");
-	  printf("GO   - Continue Execution\r\n");
+	  printf("STEP - Single Step Opcode Mode\r\n");
+	  printf("STOP - Stop at Address, 0x1000>=Off\r\n");
 	  printf("SET  - Set Memory Bytes\r\n");
 	  printf("REG  - Set Register Value\r\n");
 	  printf("DUMP - Display Memory in Hex\r\n");
 	  printf("STAT - Show Registers/Status\r\n");
+	  printf("GFX  - Toggle Graphics Pixel\r\n");
+	  printf("CLS  - Clear Graphics Screen\r\n");
+	  printf("LOOK - Enable Graphics Focus\r\n");
+	  printf("GO   - Continue Execution\r\n");
+
+
 	  printf("Command: ");
 	
-	  scanf("%s", &cmd);	/* Check for Keyboard Input from the Debug Window */
+	scanf("%s", &cmd); 	/* Check for Keyboard Input from the Debug Window */
 
 	/* Convert command to uppercase */
 	for (ptr = cmd; ptr < cmd + strlen(cmd); ptr++)
@@ -119,8 +127,10 @@ menu:
 
 	if (0==strcmp("ON", cmd)) { DEBUG = 1; }
 	if (0 == strcmp("OFF", cmd)) { DEBUG = 0; }
-	if (0 == strcmp("STEP", cmd)) { DEBUG = 2; }
+	if (0 == strcmp("STEP", cmd)) { DEBUG = 2; goto status; }
 	if (0 == strcmp("STAT", cmd)) { disp_menu = 1; goto status; }
+	if (0 == strcmp("LOOK", cmd)) { last_debug = DEBUG; DEBUG = 4; }
+	if (0 == strcmp("GO", cmd)) { if (DEBUG == 4) DEBUG=last_debug; }
 	if (0 == strcmp("DUMP",cmd)) { /* Dump */
 		printf("Hex: Address Count? ");
 		scanf("%X %X", &i, &j);
@@ -152,26 +162,74 @@ menu:
 		scanf("%X %X", &addr,&k);
 		printf("\r\n");
 		for (i = 0; i < k; i++) { /* set mem */
+			if (addr >= 0x1000) break;
 			printf("%4.4X: 0x", addr);
 			scanf("%X", &byte);
+			if (addr >= 0x1000) break;
 			memory[addr] = byte;
 			addr++;
 		} /* end, set mem */
 		goto menu;
 	} /* end Set */
 	if (0 == strcmp("REG", cmd)) { /* Set Reg */
+
 		printf("Set Register Value\r\n");
-		printf("V: x0-F, I: x10, SP: x11, PC: x12\r\n");
-		printf("Hex: Reg# Value? ");
-		scanf("%X %X", &i, &j);
-		if (i < 0x10) V[i] = j; /* V0-F */
-		else if (i == 0x10) I = j;  /* I */
-		else if (i == 0x11) sp = j; /* SP */
-		else if (i == 0x12) pc = j;  /* PC */
+		printf("Register Names: V0-F, I, SP, PC\r\n");
+		printf("Enter: Name Hex_Value? ");
+		scanf("%2s %X", cmd, &j);
+		/* Convert register name to uppercase */
+		for (ptr = cmd; ptr < cmd + strlen(cmd); ptr++)
+			if (islower(*ptr)) *ptr = _toupper(*ptr);
+
+		if (*cmd == 'V') { // V0-F
+			sscanf(cmd+1,"%x",&i);
+			if (i < 0x10) V[i] = j;
+			else printf("*** ERROR ***\r\n*** Bad Register Name: %s", cmd);
+		} /* end, V0-F */
+		else if (*cmd == 'I') { /* I */
+		   if (j<0x1000) I = j;
+		   else printf("*** ERROR ***\r\n*** Bad Index Value: 0x%X > 0xFFF", j);
+		} /* end, I */
+		else if (*cmd == 'S' && cmd[1] == 'P') { /* SP */
+			if (j<16) sp = j;
+			else printf("*** ERROR ***\r\n*** Bad SP Value: 0x%X > 16", j);
+		} /* end, SP */
+		else if (*cmd == 'P' && cmd[1] == 'C') { /* PC */
+			if (j % 2 == 1) printf("*** ERROR ***\r\n*** Bad PC Value: 0x%X is odd", j);
+			else if (j>0xFFE) printf("*** ERROR ***\r\n*** Bad PC Value: 0x%X > 0xFFE", j);
+			else pc = j;
+		} /* end, PC */
+		else printf("*** ERROR ***\r\n*** Bad Register Name: %s",cmd);
 		printf("\r\n");
 		disp_menu = 1; /* Signal menu display */
 		goto status;
 	} /* end, Set Reg */
+
+	if (0 == strcmp("GFX", cmd)) { /* GFX */
+		unsigned int X, Y;
+
+		printf("Decimal Screen Coordinates: X Y? ");
+		scanf("%u %u", &X, &Y);
+
+		if (X >= gfx_x) printf("*** ERROR X:%d Coordinate > %d", X, gfx_x-1); // Bad Horizontal 
+		else if (Y>=gfx_y) printf("*** ERROR Y:%d Coordinate > %d", Y, gfx_y-1); // Bad Vertical 
+		else if (gfx[X + gfx_x*Y] == 1) gfx[X + gfx_x*Y]=0; // Toggle Pixel OFF
+		else gfx[X + gfx_x*Y] = 1; // Toggle Pixel ON
+		printf("\r\n");
+		drawFlag = true;
+	} /* end GFX */
+
+	if (0 == strcmp("CLS", cmd)) { /* CLS */
+		unsigned int i;
+
+		for (i=0; i<gfx_size;i++) gfx[i] = 0;
+		printf("\r\n");
+		// Debug Test Full screen Mode Graphics mapping
+//		SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
+
+		drawFlag = true;
+	} /* end CLS */
+
 
   } /* end Debug Keyboard Input */
 }
@@ -189,7 +247,7 @@ void Chip8::init() {
     sp      = 0;        // Reset stack pointer
 
     // Clear the display
-    for (int i = 0; i < 2048; ++i) {
+    for (unsigned i = 0; i < gfx_size; ++i) {
         gfx[i] = 0;
     }
 
@@ -344,7 +402,7 @@ void Chip8::emulate_cycle() {
 				// 00E0 - Clear screen
                 case 0x00E0:
 
-					for (int i = 0; i < 2048; ++i) {
+					for (unsigned i = 0; i < gfx_size; ++i) {
                         gfx[i] = 0;
                     }
                     drawFlag = true;
@@ -357,11 +415,20 @@ void Chip8::emulate_cycle() {
 
                 // 00EE - Return from subroutine
                 case 0x00EE:
+					if (sp > 0) { // If there is a Subroutine Active
+						--sp;
+						pc = stack[sp];
+						pc += 2;
+						strcpy(ins, "RET                  ' Return"); /* Return from Subroutine */
+					} // end, If there is a Subroutine Active
+					else { // Stack Underflow, bad Return Opcode
+						strcpy(ins, "RET                  ' Return"); /* Return from Subroutine */
+						strcat(ins, "\r\n*** EXECUTION ERROR ***\r\n");
+						strcat(ins, "*** STACK UNDERFLOW ***\r\n");
+						strcat(ins, "*** Too many 'RET' Operations ***\r\n");
+						DEBUG = 2; // Put Debugger in Single Step Mode
+					} // end, Stack Underflow, bad Return Opcode
 
-					--sp;
-                    pc = stack[sp];
-                    pc += 2;
-					strcpy(ins, "RET                  ' Return"); /* Return from Subroutine */
 					trace(ins);   /* Debug Trace */
 
 					break;
@@ -427,7 +494,18 @@ void Chip8::emulate_cycle() {
 					/* Chip-48 OpCode */
 
 					/* Not implemented yet */
-					SDL_SetWindowFullscreen(window, 0);
+//					SDL_SetWindowFullscreen(window, 0);  // Set Low Resolution Graphics
+
+					gfx_mode = false;  // Assume Low resolution
+					gfx_x = 64;		// 64 pixel & 64 byte buffer horixontal dimension
+					gfx_y = 32;		// 32 pixel & 32 byte buffer vertical dimension
+
+					start_SDL(gfx_x, gfx_y, gfx_mode);		// Start SDL Graphics
+
+					// Clear the display
+					for (unsigned i = 0; i < gfx_size; ++i) {
+						gfx[i] = 0;
+					}
 
 					pc += 2; /* Next Instruction */
 
@@ -440,7 +518,19 @@ void Chip8::emulate_cycle() {
 					/* Chip-48 OpCode */
 
  				    /* Not implemented yet */
-					SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
+
+//					SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);  // Set High Resolution Graphics
+
+					// High Resolution Graphics
+					gfx_mode = true;  // Assume High resolution
+					gfx_x = 128;		// 128 pixel & 128 byte buffer horixontal dimension
+					gfx_y = 64;		// 64 pixel & 64 byte buffer vertical dimension
+
+					start_SDL(gfx_x, gfx_y, gfx_mode);		// Start SDL Graphics
+					// Clear the display
+					for (unsigned i = 0; i < gfx_size; ++i) {
+						gfx[i] = 0;
+					}
 
 					pc += 2; /* Next Instruction */
 
@@ -454,9 +544,12 @@ void Chip8::emulate_cycle() {
                 default:
 
 					printf("\nUnknown op code: %.4X\r\n", opcode);
-					pc += 2;
+//					pc += 2;
 
 					sprintf(ins, "Unknown OpCode      ' Code Error");
+					strcat(ins, "\r\n*** EXECUTION ERROR ***\r\n");
+					DEBUG = 2; // Put Debugger in Single Step Mode
+
 					trace(ins);   /* Debug Trace */
 
 								  //   exit(3);
@@ -476,12 +569,20 @@ void Chip8::emulate_cycle() {
 
         // 2NNN - Calls subroutine at NNN
         case 0x2000:
+			if (sp < 16) { // Enforce 16 nested subroutine call limit
+				stack[sp] = pc;
+				++sp;
+				pc = opcode & 0x0FFF;
+				sprintf(ins, "CALL  #%1X%02X           ' Call Subroutine", msbl, lsb); /* Call Subroutine */
+			} // end, Enforce 16 nested subroutine call limit
+			else { // Stack Overflow, bad Call Opcode
+				sprintf(ins, "CALL  #%1X%02X           ' Call Subroutine", msbl, lsb); /* Call Subroutine */
+				strcat(ins, "\r\n*** EXECUTION ERROR ***\r\n");
+				strcat(ins, "*** STACK OVERFLOW ***\r\n");
+				strcat(ins, "*** Too many 'CALL' Operations ***\r\n");
+				DEBUG = 2; // Put Debugger in Single Step Mode
+			} // end, Stack Overflow, bad Call Opcode
 
-			stack[sp] = pc;
-            ++sp;
-            pc = opcode & 0x0FFF;
-
-			sprintf(ins, "CALL  #%1X%02X           ' Call Subroutine", msbl, lsb); /* Call Subroutine */
 			trace(ins);
 
 			break;
@@ -674,9 +775,11 @@ void Chip8::emulate_cycle() {
 
 					
 					printf("\nUnknown op code: %.4X\n", opcode);
-					pc += 2;
+//					pc += 2;
 
 					sprintf(ins, "Unknown OpCode      ' Code Error");
+					strcat(ins, "\r\n*** EXECUTION ERROR ***\r\n");
+					DEBUG = 2; // Put Debugger in Single Step Mode
 					trace(ins);   /* Debug Trace */
 
 								  //  exit(3);
@@ -711,6 +814,24 @@ void Chip8::emulate_cycle() {
         // BNNN - Jumps to the address NNN plus V0.
         case 0xB000:
             
+			// Check User's Jump Target Address 
+
+			if (((opcode & 0x0FFF) + V[0]) >= 0x0FFF) { // Out of Address Space
+			// User's Target address is out of memory limits
+				uint16_t addr = (opcode & 0x0FFF) + V[0]; // Get Target address
+				char temp[128];
+
+				sprintf(ins, "JP    V0,#%03X        ' Jump to Address V0+#%03X=0x%4.4X", lsb + (msbl << 8), lsb + (msbl << 8),addr); /* Jump to ADDRESS */
+				strcat(ins, "\r\n*** EXECUTION ERROR ***\r\n");
+				strcat(ins, "*** Memory Range Limit***\r\n");
+				sprintf(temp, "*** Invalid Jump Address: 0x%04.4X\r\n", addr);
+				strcat(ins, temp);
+				DEBUG = 2; // Put Debugger in Single Step Mode
+				trace(ins);
+				break; // Report Error
+
+			} // end, Out of Address Space
+			
 			pc = (opcode & 0x0FFF) + V[0];
 
 			sprintf(ins, "JP    V0,#%03X        ' Jump to Address V0+#%03X", lsb + (msbl << 8), lsb + (msbl << 8)); /* Jump to ADDRESS */
@@ -737,31 +858,94 @@ void Chip8::emulate_cycle() {
         // VF is set to 1 if any screen pixels are flipped from set to unset
         // when the sprite is drawn (XORed), and to 0 if that doesn't happen.
         case 0xD000:
-        {
-            unsigned short x = V[(opcode & 0x0F00) >> 8];
-            unsigned short y = V[(opcode & 0x00F0) >> 4];
-            unsigned short height = opcode & 0x000F;
-            unsigned short pixel;
+		{
+			unsigned short x = V[(opcode & 0x0F00) >> 8]; // Horizontal Screen Coordinate
+			unsigned short y = V[(opcode & 0x00F0) >> 4]; // Vertical Screen Coordinate
 
-			
+			unsigned short height = opcode & 0x000F;
+			unsigned short pixel;
+
+			if (height == 0 && gfx_mode == true) height = 16; /* Check for a Chip-48 16x16 sprite draw opcode*/
+
+			// Check for Video Range Index Exceptions for High Resolution 16x16 Sprite
+			if (((x + 15 + ((y + height - 1) * gfx_x)) >= gfx_x*gfx_y) && height==16) { // Video Index Error
+				sprintf(ins, "DRW   V%1X,V%1X,#%1x       ' Display #%1X Sprite(s) from [I] at V%1X,V%1X", msbl, lsbh, lsbl, lsbl, msbl, lsbh);
+				strcat(ins, "\r\n*** EXECUTION ERROR ***\r\n");
+				strcat(ins, "*** Video Index Range ***\r\n");
+				DEBUG = 2; // Put Debugger in Single Step Mode
+				trace(ins);
+				break; // Report Error
+			} // end, Video Index Error
+			  
+			  // Check for Video Range Index Exceptions for Low Resolution
+			if ((x + 7 + ((y + height-1) * gfx_x)) >= gfx_x*gfx_y)  { // Video Index Error
+				sprintf(ins, "DRW   V%1X,V%1X,#%1x       ' Display #%1X Sprite(s) from [I] at V%1X,V%1X", msbl, lsbh, lsbl, lsbl, msbl, lsbh);
+				strcat(ins, "\r\n*** EXECUTION ERROR ***\r\n");
+				strcat(ins, "*** Video Index Range ***\r\n");
+				DEBUG = 2; // Put Debugger in Single Step Mode
+				trace(ins);
+				break; // Report Error
+			} // end, Video Index Error
+
+			if (height == 16 && gfx_mode == true) { /* Check for a Chip-48 16x16 sprite draw opcode*/
+				/* draw 16 lines two bytes wide */
+
+				V[0xF] = 0;  /* Assume no flipped pixels */
+				for (int yline = 0; yline < height; yline++) { /* for N Pixels high */
+
+					// First Horizontal Byte				
+					pixel = memory[I + 2*yline];  /* Get a Sprite byte from Memory*/
+					for (int xline = 0; xline < 8; xline++) /* for 8 pixels wide */
+					{
+						if ((pixel & (0x80 >> xline)) != 0) /* if memory pixel is on */
+						{
+							if (gfx[(x + xline + ((y + yline) * gfx_x))] == 1)
+							{ /* if screen pixel is on */
+								V[0xF] = 1;
+							} /* end, if screen pixel is on */
+							gfx[x + xline + ((y + yline) * gfx_x)] ^= 1; /* XOR Graphics Bits */
+						} /* end, if memory pixel is on */
+					} /* end for 8 pixels wide */
+
+					  // Second Horizontal Byte				
+					pixel = memory[I + 1 + 2*yline];  /* Get a Sprite byte from Memory*/
+					for (int xline = 0; xline < 8; xline++) /* for 8 pixels wide */
+					{
+						if ((pixel & (0x80 >> xline)) != 0) /* if memory pixel is on */
+						{
+							if (gfx[(x + 8 + xline + ((y + yline) * gfx_x))] == 1)
+							{ /* if screen pixel is on */
+								V[0xF] = 1;
+							} /* end, if screen pixel is on */
+						gfx[x + 8 + xline + ((y + yline) * gfx_x)] ^= 1; /* XOR Graphics Bits */
+						} /* end, if memory pixel is on */
+					} /* end for 8 pixels wide */
+
+
+				} /* end, for N pixels high */
+
+			} /* end, Check for a Chip-48 16x16 sprite draw opcode*/
+
+			else { // Low Graphics Resolution Sprite
 			V[0xF] = 0;  /* Assume no flipped pixels */
-            for (int yline = 0; yline < height; yline++) /* for N Pixels high */
-            {
-                pixel = memory[I + yline];  /* Get a Sprite byte from Memory*/
-                for (int xline = 0; xline < 8; xline++) /* for 8 pixels wide */
-                {
-                    if((pixel & (0x80 >> xline)) != 0) /* if memory pixel is on */
-                    {
-                        if(gfx[(x + xline + ((y + yline) * 64))] == 1) 
-                        { /* if screen pixel is on */
-                            V[0xF] = 1;
-                        } /* end, if screen pixel is on */
-                        gfx[x + xline + ((y + yline) * 64)] ^= 1; /* XOR Graphics Bits */
-                    } /* end, if memory pixel is on */
-                } /* end for 8 pixels wide */
-            } /* end, for N pixels high */
+			for (int yline = 0; yline < height; yline++) /* for N Pixels high */
+			{
+				pixel = memory[I + yline];  /* Get a Sprite byte from Memory*/
+				for (int xline = 0; xline < 8; xline++) /* for 8 pixels wide */
+				{
+					if ((pixel & (0x80 >> xline)) != 0) /* if memory pixel is on */
+					{
+						if (gfx[(x + xline + ((y + yline) * gfx_x))] == 1)
+						{ /* if screen pixel is on */
+							V[0xF] = 1;
+						} /* end, if screen pixel is on */
+						gfx[x + xline + ((y + yline) * gfx_x)] ^= 1; /* XOR Graphics Bits */
+					} /* end, if memory pixel is on */
+				} /* end for 8 pixels wide */
+			} /* end, for N pixels high */
 
-            drawFlag = true;
+		} // end,  Low Graphics Resolution Sprite
+			drawFlag = true;
             pc += 2;
         }
 		sprintf(ins, "DRW   V%1X,V%1X,#%1x       ' Display #%1X Sprite(s) from [I] at V%1X,V%1X", msbl, lsbh, lsbl, lsbl, msbl, lsbh);
@@ -805,9 +989,11 @@ void Chip8::emulate_cycle() {
 
 					
 					printf("\nUnknown op code: %.4X\n", opcode);
-					pc += 2;
+//					pc += 2;
 
 					sprintf(ins, "Unknown OpCode      ' Code Error");
+					strcat(ins, "\r\n*** EXECUTION ERROR ***\r\n");
+					DEBUG = 2; // Put Debugger in Single Step Mode
 					trace(ins);   /* Debug Trace */
 
 					//   exit(3);
@@ -834,7 +1020,8 @@ void Chip8::emulate_cycle() {
                 {
                     bool key_pressed = false;
 
-					
+					drawFlag = true; // Refresh video if waiting on keyinput
+
 					for(int i = 0; i < 16; ++i)
                     {
                         if(key[i] != 0)
@@ -844,11 +1031,10 @@ void Chip8::emulate_cycle() {
                         }
                     }
 
-                    // If no key is pressed, return and try again.
-                    if(!key_pressed)
-                        return;
-
-                    pc += 2;
+					// If a key was pressed increment PC,
+					// otherwise don't increment PC
+					// To allow the Debugger to show a keyboard wait state
+					if (key_pressed) pc += 2; // Key pressed
 
 					sprintf(ins, "LD    V%1X,K           ' V%1X = (KEY) Get Key Input", msbl, msbl);
 					trace(ins);
@@ -889,7 +1075,26 @@ void Chip8::emulate_cycle() {
                         V[0xF] = 1;
                     else
                         V[0xF] = 0;
-                    I += V[(opcode & 0x0F00) >> 8];
+
+					if (I + V[(opcode & 0x0F00) >> 8] > 0xFFF) { // Out of Address Space
+						// User's Target address is out of memory limits
+						uint16_t addr = I + V[(opcode & 0x0F00) >> 8]; // Get Target address
+						char temp[128];
+						int last_debug = DEBUG;
+
+						sprintf(ins, "ADD   I,V%1X           ' Set I = I + V%1X, I=0x%4.4X", msbl, msbl,I);
+						strcat(ins, "\r\n*** EXECUTION WARNING ***\r\n");
+						strcat(ins, "*** Memory Range Limit ***\r\n");
+						sprintf(temp, "*** Invalid Index Address: 0x%04.4X\r\n", addr);
+						strcat(ins, temp);
+						DEBUG = 1; // Temporarily Put Debugger in Trace Mode
+						trace(ins);
+						DEBUG = last_debug; // Restore Debugger State
+
+					} // end, Out of Address Space
+
+					
+					I += V[(opcode & 0x0F00) >> 8];
                     pc += 2;
 
 					sprintf(ins, "ADD   I,V%1X           ' Set I = I + V%1X", msbl, msbl);
@@ -929,7 +1134,21 @@ void Chip8::emulate_cycle() {
                 // at the addresses I, I plus 1, and I plus 2
                 case 0x0033:
                     
-					
+					if (I > 0xFFD) { // Out of Address Space
+						// User's Target address is out of memory limits
+						uint16_t addr = I+2; // Get Target address
+						char temp[128];
+
+						sprintf(ins, "LD    B,V%1X           ' Store BCD of V%1X at [I] to [I+2]", msbl, msbl);
+						strcat(ins, "\r\n*** EXECUTION ERROR ***\r\n");
+						strcat(ins, "*** Memory Range Limit ***\r\n");
+						sprintf(temp, "*** Invalid Index Address: 0x%04.4X-0x%04.4X\r\n",I, addr);
+						strcat(ins, temp);
+						DEBUG = 2; // Put Debugger in Step Mode
+						trace(ins);
+						break;
+					} // end, Out of Address Space
+
 					memory[I]     = V[(opcode & 0x0F00) >> 8] / 100;
                     memory[I + 1] = (V[(opcode & 0x0F00) >> 8] / 10) % 10;
                     memory[I + 2] = (V[(opcode & 0x0F00) >> 8] % 100) % 10;
@@ -943,12 +1162,28 @@ void Chip8::emulate_cycle() {
                 // FX55 - Stores V0 to VX in memory starting at address I
                 case 0x0055:
                     
+					if (I > (0x1000-(msbl+1))) { // Out of Address Space
+						// User's Target address is out of memory limits
+						uint16_t addr = I + msbl; // Get Target address
+						char temp[128];
+
+						sprintf(ins, "LD    [I],V%1X         ' Store V0 thru V%1X at [I]", msbl, msbl);
+						strcat(ins, "\r\n*** EXECUTION ERROR ***\r\n");
+						strcat(ins, "*** Memory Range Limit ***\r\n");
+						sprintf(temp, "*** Invalid Index Address: 0x%04.4X-0x%04.4X\r\n", I, addr);
+						strcat(ins, temp);
+						DEBUG = 2; // Put Debugger in Step Mode
+						trace(ins);
+						break;
+					} // end, Out of Address Space
+
+
 					for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i)
                         memory[I + i] = V[i];
 
                     // On the original interpreter, when the
                     // operation is done, I = I + X + 1.
-                    I += ((opcode & 0x0F00) >> 8) + 1;
+					// I += ((opcode & 0x0F00) >> 8) + 1;
                     pc += 2;
 
 					sprintf(ins, "LD    [I],V%1X         ' Store V0 thru V%1X at [I]", msbl, msbl);
@@ -958,13 +1193,28 @@ void Chip8::emulate_cycle() {
 
                 case 0x0065:
                     
-					
+					if (I > (0x1000 - (msbl + 1))) { // Out of Address Space
+						// User's Target address is out of memory limits
+						uint16_t addr = I + msbl; // Get Target address
+						char temp[128];
+
+						sprintf(ins, "LD    V%1X,[I]         ' Read V0 thru V%1X From [I]", msbl, msbl);
+						strcat(ins, "\r\n*** EXECUTION ERROR ***\r\n");
+						strcat(ins, "*** Memory Range Limit ***\r\n");
+						sprintf(temp, "*** Invalid Index Address: 0x%04.4X-0x%04.4X\r\n", I, addr);
+						strcat(ins, temp);
+						DEBUG = 2; // Put Debugger in Step Mode
+						trace(ins);
+						break;
+					} // end, Out of Address Space
+
+
 					for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i)
                         V[i] = memory[I + i];
 
                     // On the original interpreter,
                     // when the operation is done, I = I + X + 1.
-                    I += ((opcode & 0x0F00) >> 8) + 1;
+					// I += ((opcode & 0x0F00) >> 8) + 1;
                     pc += 2;
 
 					sprintf(ins, "LD    V%1X,[I]         ' Read V0 thru V%1X From [I]", msbl, msbl);
@@ -976,8 +1226,27 @@ void Chip8::emulate_cycle() {
 					/* Chip-48 Instruction */
 					/* Store Registers V0-V[msbl] in RPL Register Store */
 
+					if (msbl>7) { // Too many Registers
+						// Opcode specifies too many registers
+						char temp[128];
+						int last_debug = DEBUG;
+
+						sprintf(ins, "LD    RPL,V%1X         ' Store V0 thru V%1X in RPL", msbl, msbl);
+						strcat(ins, "\r\n*** EXECUTION WARNING ***\r\n");
+						strcat(ins, "*** Too many Registers - Bad OpCode ***\r\n");
+						sprintf(temp, "*** Valid Registers: 0-7 ***\r\n");
+						strcat(ins, temp);
+						DEBUG = 1; // Temporarily Put Debugger in Trace Mode
+						trace(ins);
+						DEBUG = last_debug; // Restore Debugger State
+
+					} // end, Too many Registers
+
+
 					/* Ignore the high order bit of msbl */
 					if (msbl > 7) msbl = 7;  /* Enforce Store limits to V0-V7 */
+
+
 					for (int i = 0; i <= msbl;  ++i) RPL[i] = V[i];
 
 					pc += 2;
@@ -990,6 +1259,22 @@ void Chip8::emulate_cycle() {
 				case 0x0085:
 					/* Chip-48 Instruction */
 					/* Load Registers V0-V[msbl] from RPL Register Store */
+
+					if (msbl>7) { // Too many Registers
+						// Opcode specifies too many registers
+						char temp[128];
+						int last_debug = DEBUG;
+
+						sprintf(ins, "LD    RPL,V%1X         ' Store V0 thru V%1X in RPL", msbl, msbl);
+						strcat(ins, "\r\n*** EXECUTION WARNING ***\r\n");
+						strcat(ins, "*** Too many Registers - Bad OpCode ***\r\n");
+						sprintf(temp, "*** Valid Registers: 0-7 ***\r\n");
+						strcat(ins, temp);
+						DEBUG = 1; // Temporarily Put Debugger in Trace Mode
+						trace(ins);
+						DEBUG = last_debug; // Restore Debugger State
+
+					} // end, Too many Registers
 
 					/* Ignore the high order bit of msbl */
 					if (msbl > 7) msbl = 7;  /* Enforce Store limits to V0-V7 */
@@ -1007,7 +1292,9 @@ void Chip8::emulate_cycle() {
 				default:
 
 					printf ("Unknown opcode [0xF000]: 0x%X\n", opcode);
-					sprintf(ins, "Unknown OpCode      ' Code Error");
+					sprintf(ins,"Unknown opcode [0xF000]: 0x%X\n", opcode);
+					strcat(ins, "\r\n*** EXECUTION ERROR ***\r\n");
+					DEBUG = 2; // Put Debugger in Single Step Mode
 					trace(ins);   /* Debug Trace */
 
 
@@ -1017,7 +1304,9 @@ void Chip8::emulate_cycle() {
         default:
 
 			printf("\nUnimplemented op code: %.4X\n", opcode);
-			sprintf(ins, "Unknown OpCode      ' Code Error");
+			sprintf(ins,"\nUnimplemented op code: %.4X\n", opcode);
+			strcat(ins, "\r\n*** EXECUTION ERROR ***\r\n");
+			DEBUG = 2; // Put Debugger in Single Step Mode
 			trace(ins);   /* Debug Trace */
 
         //  exit(3);

@@ -13,27 +13,29 @@
 
 using namespace std;
 
-// Keypad keymap
-uint8_t keymap[16] = {
-	SDLK_x,
-	SDLK_1,
-	SDLK_2,
-	SDLK_3,
-	SDLK_q,
-	SDLK_w,
-	SDLK_e,
-	SDLK_a,
-	SDLK_s,
-	SDLK_d,
-	SDLK_z,
-	SDLK_c,
-	SDLK_4,
-	SDLK_r,
-	SDLK_f,
-	SDLK_v,
+
+uint32_t keymap[16] = {
+	SDLK_KP_PERIOD,		// 0
+	SDLK_KP_1,			// 1
+	SDLK_KP_2,			// 2
+	SDLK_KP_3,			// 3
+	SDLK_KP_4,			// 4
+	SDLK_KP_5,			// 5
+	SDLK_KP_6,			// 6
+	SDLK_KP_7,			// 7
+	SDLK_KP_8,			// 8
+	SDLK_KP_9,			// 9
+	SDLK_KP_0,			// A
+	SDLK_KP_ENTER,		// B
+	SDLK_KP_DIVIDE,		// C
+	SDLK_KP_MULTIPLY,	// D
+	SDLK_KP_MINUS,		// E
+	SDLK_KP_PLUS		// F
 };
 
-void start_SDL(unsigned gfx_x, unsigned gfx_y);
+
+
+void start_SDL(unsigned gfx_x, unsigned gfx_y, bool gfx_mode);
 
 SDL_Window* window = NULL;
 SDL_Renderer *renderer;
@@ -53,11 +55,11 @@ int main(int argc, char **argv) {
 		/* Parse out filename */
 		j = strlen(argv[0]);
 		for (i = j; j > 0; j--) if (*(argv[0] + j) == '\\') break;
-		sprintf((char *)debug_out, argv[0] + j + 1); 
+		sprintf((char *)debug_out, argv[0] + j); 
 		printf("Usage:\r\n\r\n%s ROM_file Debug Output_File\r\n\r\n",debug_out);
-		cout << "ROM_file    -   Filename of Chip8 program to Execute\r\n" << endl;
+		cout << "ROM_file    -   Filename of Chip-8/48 program to Execute\r\n" << endl;
 		cout << "Debug       -   Initiate Debug Trace in Console Window or File\r\n" << endl;
-		cout << "Output_File -   Filename to send Debug Trace Information to\r\n" << endl;
+		cout << "Output_File -   Output Filename for Debug Trace Information\r\n" << endl;
 		cout << "Notes:\r\n" << endl;
 		cout << "The Debug and Output_File parameters are optional.\r\n" ;
 		cout << "To enter Debug Mode from the Console Window\r\n" ;
@@ -80,10 +82,21 @@ int main(int argc, char **argv) {
 
 	Chip8 chip8 = Chip8();          // Initialise Chip8
 
+	SetConsoleTitle(TEXT("Chip-8/48 Debugger"));
+
 	// Assume Low Resolution Graphics
-	chip8.gfx_mode = FALSE;  // Assume Low resolution
+
+	chip8.gfx_mode = false;  // Assume Low resolution
 	chip8.gfx_x = 64;		// 64 pixel & 64 byte buffer horixontal dimension
 	chip8.gfx_y = 32;		// 32 pixel & 32 byte buffer vertical dimension
+
+
+// High Resolution Graphics
+/*
+	chip8.gfx_mode = TRUE;  // Assume High resolution
+	chip8.gfx_x = 128;		// 128 pixel & 128 byte buffer horixontal dimension
+	chip8.gfx_y = 64;		// 64 pixel & 64 byte buffer vertical dimension
+*/
 
 
 	// Temporary pixel buffer, Assume High Resolution
@@ -92,7 +105,7 @@ int main(int argc, char **argv) {
 
 load:
 
-	start_SDL(chip8.gfx_x, chip8.gfx_y);		// Start SDL Graphics
+	start_SDL(chip8.gfx_x, chip8.gfx_y, chip8.gfx_mode);		// Start SDL Graphics
 
 
 	// Attempt to load ROM & Initialize Debugger
@@ -101,10 +114,18 @@ load:
 		SDL_Quit();
 		return 2;
 	}
+	if (argc < 3) printf("\r\nPress <Escape> or <BACKSPACE> to Debug\r\n");
 
 	// Emulation loop
 	while (true) {
-		chip8.emulate_cycle();
+
+		if (chip8.DEBUG!=4) chip8.emulate_cycle();  // Execute instructions
+		else { // Pause instruction execution & Allow user to view Graphics screen
+			char ins[] = "Pause Mode";
+			chip8.trace(ins);  /* Debud Trace */
+			chip8.drawFlag = true;
+		} // end, Pause instruction execution & Allow user to view Graphics screen
+
 
 		// Process SDL events
 		SDL_Event e;
@@ -165,16 +186,28 @@ load:
 
 
 
-void start_SDL(unsigned gfx_x, unsigned gfx_y)
+void start_SDL(unsigned gfx_x, unsigned gfx_y, bool gfx_mode)
 {
+	int w, h;
 
 
-int w = 1024;                   // Window width in screen coordinates
-int h = 512;                   // Window height in screen coordinates
+	SDL_Quit();
+	
+	// The window we'll be rendering to
 
-							   // The window we'll be rendering to
+// Old Original Window Size
+	if (gfx_mode == true) { /* High Resolution Graphics */
+		w = 896;			      // Window width in pixels
+		h = 644;		          // Window height in pixels
 
-							   // Initialize SDL
+	} /* end, High Resolution Graphics */
+
+	else { // Low Resolution Graphics Mode
+			w = 768;                   // Window width in pixels
+			h = 512;                   // Window height in pixels
+	} // end, Low Resolution Graphics 
+
+// Initialize SDL
 if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 	printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
 	SDL_Quit();
@@ -182,7 +215,7 @@ if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 }
 // Create window
 window = SDL_CreateWindow(
-	"CHIP-8 Emulator",
+	"CHIP-8/48 Emulator",
 	SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 	w, h, SDL_WINDOW_SHOWN
 );
